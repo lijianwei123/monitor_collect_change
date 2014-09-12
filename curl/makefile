@@ -18,6 +18,7 @@ SRCS = look.c\
 
 OBJS = $(SRCS:.c=.o)
 
+
 $(TARGET): $(SRCS)
 	$(CC) $^ $(CFLAGS) -o $(TARGET)
 

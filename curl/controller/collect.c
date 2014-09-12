@@ -8,10 +8,12 @@ static int collect_preg_match(char *url, char *pattern);
 int collect_list_request_cb(struct evhttp_request *req, void *arg, struct evbuffer *buf)
 {
 	MYSQL conn;
+	memset(&conn, 0, sizeof(MYSQL));
 	int retCode = -1;
-	char *select_sql;
-	char *json_str;
+	char *select_sql = NULL;
+	char *json_str = NULL;
 	result_data_t result_data;
+	memset(&result_data, 0, sizeof(result_data_t));
 
 
 	retCode = mysql_connect(&conn, &mysql_connect_info);
@@ -42,14 +44,20 @@ int collect_insert_request_cb(struct evhttp_request *req, void *arg, struct evbu
 	int retCode = -1;
 	struct evkeyvalq *post_params_ptr = calloc(sizeof(struct evkeyvalq), 1);
 	char *url = NULL, *pattern = NULL;
+	char *escape_url = NULL, *escape_pattern = NULL;
 	char modify_time[20] = {0};
 
 	MYSQL conn;
+	memset(&conn, 0, sizeof(MYSQL));
 	const char insert_template_sql[] = "insert into `df_monitor_collection` (`url`, `pattern`, `modify_time`) values('%s', '%s', '%s')";
-	char *insert_sql;
-	char *json_str;
+	char *insert_sql = NULL;
+	char *json_str = NULL;
 	unsigned long result = 0l;
 
+
+	if (!is_x_www_form_urlencoded(req)) {
+		goto done;
+	}
 
 	//获取参数
 	retCode = postParams(req, post_params_ptr);
@@ -58,11 +66,9 @@ int collect_insert_request_cb(struct evhttp_request *req, void *arg, struct evbu
 	}
 
 	url = postParam(post_params_ptr, "url");
-	//pattern = postParam(post_params_ptr, "pattern");
+	pattern = postParam(post_params_ptr, "pattern");
 	if (url == NULL || pattern == NULL) {
 		retCode = -1;
-		evhttp_add_header(evhttp_request_get_output_headers(req), "Content-type", "text/html");
-		evbuffer_add_printf(buf, "%s", "error");
 		goto done;
 	}
 
@@ -77,8 +83,11 @@ int collect_insert_request_cb(struct evhttp_request *req, void *arg, struct evbu
 		goto close;
 	}
 
-	insert_sql = calloc(strlen(insert_template_sql) + strlen(url) + strlen(pattern) + strlen(modify_time) + 1, 1);
-	sprintf(insert_sql, insert_template_sql, url, pattern, modify_time);
+	escape_url = cap_mysql_escape_string(&conn, url, strlen(url));
+	escape_pattern = cap_mysql_escape_string(&conn, pattern, strlen(pattern));
+
+	insert_sql = calloc(strlen(insert_template_sql) + strlen(escape_url) + strlen(escape_pattern) + strlen(modify_time) + 1, 1);
+	sprintf(insert_sql, insert_template_sql, escape_url, escape_pattern, modify_time);
 
 	retCode = mysql_execute(&conn, insert_sql, &result);
 	if (retCode) {
@@ -104,9 +113,13 @@ done:
 		free(url);
 	if (pattern)
 		free(pattern);
+	if (escape_url)
+		free(escape_url);
+	if (escape_pattern)
+		free(escape_pattern);
 	if (insert_sql)
 		free(insert_sql);
-
+	
 return retCode;
 }
 
@@ -122,11 +135,15 @@ int collect_modify_request_cb(struct evhttp_request *req, void *arg, struct evbu
 	int id_int = 0;
 
 	MYSQL conn;
+	memset(&conn, 0, sizeof(MYSQL));
 	const char update_template_sql[] = "update `df_monitor_collection` set `url` = '%s', `pattern` = '%s' where id = %d";
-	char *update_sql;
-	char *json_str;
+	char *update_sql = NULL;
+	char *json_str = NULL;
 	unsigned long result = 0l;
 
+	if (!is_x_www_form_urlencoded(req)) {
+		goto done;
+	}
 
 	//获取参数
 	retCode = postParams(req, post_params_ptr);
@@ -194,11 +211,15 @@ int collect_del_request_cb(struct evhttp_request *req, void *arg, struct evbuffe
 	int id_int = 0;
 
 	MYSQL conn;
+	memset(&conn, 0, sizeof(MYSQL));
 	const char delete_template_sql[] = "delete from df_monitor_collection where id = %d";
-	char *delete_sql;
-	char *json_str;
+	char *delete_sql = NULL;
+	char *json_str = NULL;
 	unsigned long result = 0l;
 
+	if (!is_get_request(req)) {
+		goto done;
+	}
 
 	retCode = getParams(req, query_params_ptr);
 
@@ -259,15 +280,20 @@ int collect_match_request_cb(struct evhttp_request *req, void *arg, struct evbuf
 	int id_int = 0;
 
 	MYSQL conn;
+	memset(&conn, 0, sizeof(MYSQL));
 	result_data_t result_data;
-	mysql_field_value_t *pointer;
+	memset(&result_data, 0, sizeof(result_data_t));
+	mysql_field_value_t *pointer = NULL;
 
 	const char select_template_sql[] = "select * from df_monitor_collection where id = %d";
-	char *select_sql;
-	char *json_str;
-	int j;
-	char *url, *pattern;
+	char *select_sql = NULL;
+	char *json_str = NULL;
+	int j = 0;
+	char *url = NULL, *pattern = NULL;
 
+	if (!is_get_request(req)) {
+		goto done;
+	}
 
 	//获取参数
 	retCode = getParams(req, query_params_ptr);
@@ -357,7 +383,7 @@ static int collect_update_match(MYSQL *conn_ptr, const char *id, int flag)
 	int retCode = -1;
 
 
-	char *update_template_sql = "update `df_monitor_collection` set match = %d, modify_time = '%s' where id = %d";
+	char *update_template_sql = "update `df_monitor_collection` set `match` = %d, `modify_time` = '%s' where id = %d";
 	update_sql = calloc(strlen(update_template_sql) + 1 + strlen(modify_time) + strlen(id) + 1, 1);
 
 	sprintf(update_sql, update_template_sql, flag, modify_time, id_int);
@@ -378,10 +404,12 @@ static int collect_update_match(MYSQL *conn_ptr, const char *id, int flag)
 static int collect_preg_match(char *url, char *pattern)
 {
 	regmatch_t pm[2];
+	memset(pm, 0, sizeof(pm));
 	int flag = 0;
 
 	long dataLen = 0L;
 	content_info_t dataInfo;
+	memset(&dataInfo, 0, sizeof(content_info_t));
 	dataLen = get_content_len(url, (setExtraCurlOpt)NULL, 1, &dataInfo);
 
 	flag = preg_match(pattern, dataInfo.contents, pm, array_count(pm));
@@ -397,11 +425,13 @@ static int collect_preg_match(char *url, char *pattern)
 int collect_batch_match(void)
 {
 	MYSQL conn;
+	memset(&conn, 0, sizeof(MYSQL));
 	int retCode = -1;
 	char *select_sql = NULL;
 	result_data_t result_data;
-	int i = 0, j = 0;
-	mysql_field_value_t *pointer;
+	memset(&result_data, 0, sizeof(result_data_t));
+	int i = 0;
+	mysql_field_value_t *pointer = NULL;
 	char *id = NULL, *url = NULL, *pattern = NULL;
 	int flag = 0;
 

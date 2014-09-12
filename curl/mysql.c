@@ -88,7 +88,7 @@ int mysql_connect(MYSQL *conn_ptr, mysql_connect_info_t *mysql_connect_info_ptr)
 	}
 
 
-	on_exit(close_mysql, (void *)conn_ptr);
+	//on_exit(close_mysql, (void *)conn_ptr);
 
 	return 0;
 }
@@ -280,5 +280,23 @@ char * mysql_result_data_convert_json(result_data_t *result_data_ptr)
 	cJSON_Delete(root);
 
 	return json_str;
+}
+
+/**
+ *	cap_mysql_escape_string
+ *	@param MYSQL *conn_ptr mysql连接
+ *	@param char *from 原始字符
+ *	@param unsigned long  length 原始字符长度
+ *	@return 转换之后字符   注意free
+ */
+char *cap_mysql_escape_string(MYSQL *conn_ptr, char *from, unsigned long length)
+{
+	unsigned long to_len = 0;
+	char *to = NULL;
+
+	to = calloc(length * 2 + 1, 1);
+	to_len = mysql_real_escape_string(conn_ptr, to, from, length);
+
+	return to;
 }
 

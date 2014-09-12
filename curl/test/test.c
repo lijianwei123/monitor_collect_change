@@ -2,9 +2,8 @@
 
 int main(int argc, char **argv)
 {
-	printf("%s\n", "weiyanping");
 	
-done:
-	printf("%s\n", "lijianwei");
-return 0;
+	printf("%d", 0 == 0);
+	return 0;
+	
 }

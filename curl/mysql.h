@@ -63,6 +63,7 @@ inline void  mysql_connection_info_init(mysql_connect_info_t *mysql_connection_i
 //mysql 数据集 result_data_t 转换为json输出
 char * mysql_result_data_convert_json(result_data_t *result_data_ptr);
 
-
+//cap_mysql_escape_string
+char *cap_mysql_escape_string(MYSQL *conn_ptr, char *from, unsigned long length);
 
 #endif /* MYSQL_H_ */

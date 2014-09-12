@@ -35,9 +35,7 @@
 //计算数组元素个数   注意array不能是个指针
 #define array_count(array) (sizeof(array)/sizeof(array[0]))
 
-
 #define get_content_len_by_header(url) get_content_len(url, (setExtraCurlOpt)NULL, 0, (content_info_t *)NULL)
-
 
 //设置curl选项
 typedef void (*setExtraCurlOpt)(CURL *curl);

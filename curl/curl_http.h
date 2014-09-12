@@ -68,6 +68,14 @@ int postParams(struct evhttp_request *req, struct evkeyvalq *post_params_ptr);
 
 char *postParam(struct evkeyvalq *post_params_ptr, const char *name);
 
+//是否get请求
+int is_get_request(struct evhttp_request *req);
+
+//是否post请求
+int is_post_request(struct evhttp_request *req);
+
+//检测是否为application/x-www-form-urlencoded
+int is_x_www_form_urlencoded(struct evhttp_request *req);
 
 void setup_http_server(const char *ip, const unsigned short port);
 

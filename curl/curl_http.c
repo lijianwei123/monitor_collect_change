@@ -98,7 +98,8 @@ char *getParam(struct evkeyvalq *query_params_ptr, const char *name)
  */
 int postParams(struct evhttp_request *req, struct evkeyvalq *post_params_ptr)
 {
-	unsigned char *data = NULL;
+	char *data = NULL;
+	ev_ssize_t n = 0;
 
 	struct  evbuffer *buf = evhttp_request_get_input_buffer(req);
 	size_t bufLen = evbuffer_get_length(buf);
@@ -106,7 +107,13 @@ int postParams(struct evhttp_request *req, struct evkeyvalq *post_params_ptr)
 	printf("bufLen:%d\n", bufLen);
 #endif
 
-	data = evbuffer_pullup(buf, -1);
+	//data = evbuffer_pullup(buf, bufLen);  使用这个因为pullup 因为有可能整理成连续内存   造成多拷贝一些多余字符
+	//evbuffer_readline evbuffer_remove  evbuffer_drain
+	data = calloc(bufLen, 1);
+	n = evbuffer_copyout(buf, data, bufLen);
+#ifdef DEBUG
+	printf("evbuffer_copyout len:%d\n", n);
+#endif
 
 #ifdef DEBUG
 	printf("postParams data %s\n", data);
@@ -114,11 +121,11 @@ int postParams(struct evhttp_request *req, struct evkeyvalq *post_params_ptr)
 
 	if (evhttp_parse_query_str(data,  post_params_ptr)) {
 		LOG(LOG_ERROR, "%s", "evhttp_parse_query_str error");
-		//free(data);
+		free(data);
 		return -1;
 	}
 
-	//free(data);
+	free(data);
 
 	return 0;
 }
@@ -136,6 +143,26 @@ char *postParam(struct evkeyvalq *post_params_ptr, const char *name)
 	if (value != NULL)
 		data = strdup(value);
 	return data;
+}
+
+//是否get请求
+int is_get_request(struct evhttp_request *req)
+{
+	return evhttp_request_get_command(req) == EVHTTP_REQ_GET;
+}
+
+//是否post请求
+int is_post_request(struct evhttp_request *req)
+{
+	return evhttp_request_get_command(req) == EVHTTP_REQ_POST;
+}
+
+//检测是否为application/x-www-form-urlencoded
+int is_x_www_form_urlencoded(struct evhttp_request *req)
+{
+	struct evkeyvalq *headers = evhttp_request_get_input_headers(req);
+	const char *content_type = evhttp_find_header(headers, "Content-Type");
+	return is_post_request(req) && !strcasecmp(content_type, "application/x-www-form-urlencoded");
 }
 
 static void gen_request_cb(struct evhttp_request *req, void *arg)
@@ -161,7 +188,7 @@ static void gen_request_cb(struct evhttp_request *req, void *arg)
 		if (!(*request_cb_complex_ptr->cb)(req, arg, buf)) {
 			evhttp_send_reply(req, 200, "OK", buf);
 		} else {
-			evhttp_send_error(req, HTTP_INTERNAL, 0);
+			evhttp_send_error(req, HTTP_INTERNAL, "error");
 		}
 	} else {
 		evhttp_send_error(req, HTTP_NOTFOUND, "can't find request callback");
@@ -172,6 +199,8 @@ static void gen_request_cb(struct evhttp_request *req, void *arg)
 		free(decoded_path);
 	if (buf != NULL)
 		evbuffer_free(buf);
+
+	evhttp_send_reply_end(req);
 }
 
 void setup_http_server(const char *ip, const unsigned short port)
