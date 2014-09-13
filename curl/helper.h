@@ -87,7 +87,7 @@ char * sucOutputByJson(void);
 char * errOutputByJson(const char *msg);
 
 //设置daemon
-void setDaemon();
+void setDaemon(char *);
 
 
 #endif /* HELPER_H_ */

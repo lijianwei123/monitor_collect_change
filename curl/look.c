@@ -23,6 +23,9 @@ pid_t batch_match_pid = 0;
 
 int block = 1;
 
+
+struct itimerval *ovalue = NULL;
+
 void show_help()
 {
 	char *b = "--------------------------------------------------------------------------------------------------\n"
@@ -55,6 +58,7 @@ void signalHandler(int signalNo)
 	if (batch_match_pid > 0) {
 		//发送信号
 		kill(batch_match_pid, SIGUSR1);
+		batch_match_pid = 0;
 	}
 
 
@@ -94,8 +98,11 @@ void signalChldHandler(int signalNo)
 //处理子进程接到的sigusr1信号
 void childSigusr1Hanlder(int signalNo)
 {
+	LOG(LOG_INFO, "childSigusr1Hanlder sinal no:%d", signalNo);
 	//取消定时任务
 	block = 0;
+
+	setitimer(ITIMER_PROF, ovalue, NULL);
 }
 
 //处理子进程 ITIMER_PROF信号
@@ -145,8 +152,9 @@ void do_batch_match(int batch_match_interval)
 		memset(&act, 0, sizeof(act));
 
 		act.sa_handler = childSigusr1Hanlder;
+		//act.sa_mask  用来设置在处理该信号时暂时将sa_mask 指定的信号搁置
 		sigfillset(&act.sa_mask);
-		act.sa_flags |= SA_RESTART;
+		act.sa_flags |= SA_RESTART; //被信号中断的系统调用会自行重启
 
 		if (sigaction(SIGUSR1, &act, 0) < 0) {
 			LOG(LOG_ERROR, "sigaction error: %s", strerror(errno));
@@ -158,10 +166,10 @@ void do_batch_match(int batch_match_interval)
 		timer.it_value.tv_sec = 3;
 		timer.it_value.tv_usec = 0;
 		timer.it_interval.tv_sec = batch_match_interval * 60;
-		timer.it_interval.tv_sec = 0;
+		timer.it_interval.tv_usec = 0;
 
-		signal(ITIMER_PROF, childBatchMatchTimerHandler);
-		setitimer(ITIMER_PROF, &timer, NULL);
+		signal(SIGPROF, childBatchMatchTimerHandler);
+		setitimer(ITIMER_PROF, &timer, ovalue);
 
 		while(block);
 	}
@@ -187,6 +195,9 @@ int main(int argc, char *argv[])
 	//batch_match
 	int batch_match = 0;
 	unsigned int batch_match_interval = 0;
+
+	//log file
+	char log_file[200] = {0};
 
 
 	//获取选项
@@ -230,9 +241,9 @@ int main(int argc, char *argv[])
 	}
 
 	daemon = iniparser_getboolean(ini_ptr, "system:daemon", 0);
-	batch_match = iniparser_getint(ini_ptr, "system:batch_match", 0);
+	batch_match = iniparser_getboolean(ini_ptr, "system:batch_match", 0);
 	batch_match_interval = iniparser_getint(ini_ptr, "system:batch_match_interval", 0);
-
+	strcpy(log_file, iniparser_getstring(ini_ptr, "system:log_file", ""));
 
 	mysql_connect_info.host = strdup(iniparser_getstring(ini_ptr, "mysql:host", "localhost"));
 	mysql_connect_info.user = strdup(iniparser_getstring(ini_ptr, "mysql:user", "root"));
@@ -245,7 +256,7 @@ int main(int argc, char *argv[])
 	iniparser_freedict(ini_ptr);
 
 	if (daemon) {
-		setDaemon();
+		setDaemon(log_file);
 		LOG(LOG_INFO, "%s", "daemon start");
 	}
 

@@ -12,6 +12,13 @@ look_mem() {
 	top -d 1 -p $pid
 }
 
+#stop 
+stop() {
+   echo "stop look"
+   local pid=`ps -ef|grep 'look -c' |grep -v 'grep'|awk '{print $2}'`
+   kill -2 $pid
+}
+
 case "$1" in
   leak)
         check_leak
@@ -19,4 +26,7 @@ case "$1" in
   mem)
         look_mem
         ;;
+  stop)
+	stop
+	;;
 esac

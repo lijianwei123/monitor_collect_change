@@ -381,8 +381,11 @@ char * errOutputByJson(const char *msg)
  * daemon(0, 0);
  */
 
-void setDaemon()
+void setDaemon(char *log_file)
 {
+#ifdef DEBUG
+	printf("log_file:%s\n", log_file);
+#endif
 	pid_t pid;
 
 	pid = fork();
@@ -398,11 +401,17 @@ void setDaemon()
 		LOG(LOG_ERROR, "setsid error:%s", strerror(errno));
 		exit(EXIT_FAILURE);
 	}
+
+	int log_fd = open(log_file, O_RDWR|O_CREAT|O_APPEND, 00744);
+	if (log_fd == -1) {
+		LOG(LOG_ERROR, "open log file %s error:%s", log_file, strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+	dup2(log_fd, STDIN_FILENO);
+	dup2(log_fd, STDOUT_FILENO);
+	dup2(log_fd, STDERR_FILENO);
+	close(log_fd);
+
 	chdir("/");
-	int null_fd = open("/dev/null", O_RDONLY|O_WRONLY);
-	dup2(STDIN_FILENO, null_fd);
-	dup2(STDOUT_FILENO, null_fd);
-	dup2(STDERR_FILENO, null_fd);
-	close(null_fd);
 }
 
