@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+
+	<style type="text/css">
+	
+	.manage-btn {
+		margin-left: 5px;
+		margin-right: 5px;
+	}
+
+	</style>
+	
+	<title>监控元素变更</title>
+	<base target="_blank"/>
+
+	<!-- 最新 Bootstrap 核心 CSS 文件 -->
+	<link rel="stylesheet" href="http://cdn.bootcss.com/twitter-bootstrap/3.0.3/css/bootstrap.min.css">
+
+	<!-- 可选的Bootstrap主题文件（一般不用引入） -->
+	<!-- <link rel="stylesheet" href="http://cdn.bootcss.com/twitter-bootstrap/3.0.3/css/bootstrap-theme.min.css"> -->
+
+	<!-- jQuery文件。务必在bootstrap.min.js 之前引入 -->
+	<script src="http://f3.v.veimg.cn/f2e/gallery/jquery/1.9.1/jquery.min.js"></script>
+
+	<!-- 最新的 Bootstrap 核心 JavaScript 文件 -->
+	<script src="http://cdn.bootcss.com/twitter-bootstrap/3.0.3/js/bootstrap.min.js"></script>
+
+    <script id="seajsnode" src="/js/seajs/sea.js"></script>
+    <script id="commonjsnode" src="/js/common.js?v=20140915141326" base-path="/js/" gallery-path="http://f3.v.veimg.cn/global_ued/js/gallery/" plugins-path="/js/plugins/" css-path="/css/" version="20140915141326"></script>
+</head>
+
+<body>
+	 <div class="container">
+	        <div class="page-header">
+	           <h1>监控元素</h1>
+	        </div>
+	        
+	         <ol class="breadcrumb">
+	            <li><a href="index.html">监控元素</a></li>
+	            <li><a class="add-monitor" href="javascript:void(0)">新增监控</a></li>
+	         </ol>
+	     
+	        <div class="row">
+	        	<div class="col-md-12 col-sm-12 col-xs-12" id="collect_list">
+	        	</div>
+	        </div>
+	 </div>
+
+	<!--[if lte IE 7]>
+        <script id="seajsnode" src="js/json.js"></script>
+        <![endif]-->
+
+	 <script id="list-template" type="text/html">
+	 		<% if (!list) { %>
+	 		<div class="jumbotron">
+	 		    <p>暂无数据</p>
+	 		 </div>
+	 		<% } else { %>
+	 		   <table class="table table-hover">
+	 		       <thead>
+	 		            <td>url</td>
+	 		            <td>pattern</td>
+	 		            <td>是否匹配</td>
+	 		            <td>匹配时间</td>
+	 		            <td>操作</td>
+	 		       </thead>
+	 		     <% for (var i in list) { %>
+	 		       <tr>
+	 		           <td><%=list[i].url%></td>
+	 		           <td><%=list[i].pattern%></td>
+	 		           <td><% if (list[i].match == 1) { %>是<% } else { %>否<% } %></td>
+	 		           <td><%=list[i].modify_time%></td>
+	 		           <td><a class="modify manage-btn" href="javascript:void(0);" data-id="<%=list[i].id%>" data-info='<%=JSON.stringify(list[i])%>'>修改</a><a class="del manage-btn" href="javascript:void(0);" data-id="<%=list[i].id%>">删除</a><a class="match manage-btn" href="javascript:void(0)" data-id="<%=list[i].id%>">匹配</a></td> 
+	 		       </tr>
+	 		     <% } %>
+	 		   </table>
+	 		<% } %>
+	 </script>
+	 
+	<script id="add-monitor-template" type="text/html">
+		  <div class="container" style="width:600px;overflow:scroll">
+			<div class="row">
+            <div class="col-md-12">
+
+			<form role="form" id="add-monitor-form">
+
+				<div class="form-group">
+					<label for="url">url</label>
+					<input name="url" type="text" class="form-control" id="url" placeholder="输入url">
+				</div>
+
+				<div class="form-group">
+					<label for="pattern">pattern</label>
+					<input name="pattern" type="text" class="form-control" id="pattern" placeholder="输入pattern">
+				</div>
+
+				<button type="button" id="submit" class="btn btn-default add-monitor-btn">Submit</button>
+			</form>
+			</div>
+			</div>
+		  </div>
+	</script>
+
+	<script id="modify-monitor-template" type="text/html">
+		  <div class="container" style="width:600px;overflow:scroll">
+			<div class="row">
+            <div class="col-md-12">
+
+			<form role="form" id="modify-monitor-form">
+
+				<div class="form-group">
+					<label for="url">url</label>
+					<input name="url" type="text" class="form-control" id="url" value="<%=url%>" placeholder="输入url">
+				</div>
+
+				<div class="form-group">
+					<label for="pattern">pattern</label>
+					<input name="pattern" type="text" class="form-control" id="pattern" value="<%=pattern%>" placeholder="输入pattern">
+				</div>
+
+				<input type="hidden" name="id" value="<%=id%>"/>
+				<button type="button" id="submit" class="btn btn-default modify-monitor-btn">Submit</button>
+			</form>
+			</div>
+			</div>
+		  </div>
+	</script>
+
+
+
+	 <script type="text/javascript">
+	    var api_host = "http://168.192.122.31:9786";
+	 	L.run('app/index', function(index){
+	 		index.init(api_host);
+	 	});
+	 </script>
+</body>
+</html>

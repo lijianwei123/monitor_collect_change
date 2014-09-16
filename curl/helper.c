@@ -324,6 +324,36 @@ int getDate(char *date)
 	return sprintf(date, "%d-%02d-%02d %02d:%02d:%02d", (1900 + p->tm_year), (1 + p->tm_mon), p->tm_mday, p->tm_hour, p->tm_min, p->tm_sec);
 }
 
+//获取扩展  只是指向 不需要free(返回指针)
+char *getExtension(const char *path)
+{
+	char *last_period;
+	last_period = strrchr(path, '.');
+	if (!last_period || strchr(last_period, '/'))
+		return NULL;
+	return last_period + 1;
+}
+
+/*
+ * 二维字符数组项较少时
+ * @param char **arr 二维数组  最后一个字符串以NULL结束
+ * @param const char *str 字符串
+ * @return int  -1未找到    0 找到
+ */
+int in_array(const char **arr, const char *str)
+{
+	const char *ptr = *arr;
+	int i = 0;
+	while(ptr != NULL) {
+		if (!strcmp(ptr, str)) {
+			return 0;
+		}
+		i++;
+		ptr = *(arr + i);
+	}
+	return -1;
+}
+
 /*
  * 解析ini  注意使用  iniparser_freedict(ini_ptr) 释放内存
  * @param   const char *ini_file_name ini文件

@@ -32,21 +32,6 @@ struct table_entry {
 	const char *content_type;
 };
 
-static const struct table_entry content_type_table[] = {
-	{ "txt", "text/plain" },
-	{ "c", "text/plain" },
-	{ "h", "text/plain" },
-	{ "html", "text/html" },
-	{ "htm", "text/htm" },
-	{ "css", "text/css" },
-	{ "gif", "image/gif" },
-	{ "jpg", "image/jpeg" },
-	{ "jpeg", "image/jpeg" },
-	{ "png", "image/png" },
-	{ "pdf", "application/pdf" },
-	{ "ps", "application/postsript" },
-	{ NULL, NULL },
-};
 
 struct request_cb_complex{
 	int (*cb)(struct evhttp_request *, void *, struct evbuffer *);
@@ -59,6 +44,9 @@ struct event_base *base;
 struct evhttp *http;
 struct request_cb_complex *request_cb_complex_head;
 
+
+//是否含有get参数
+int have_get_params(struct evhttp_request *req);
 
 int getParams(struct evhttp_request *req, struct evkeyvalq *query_params_ptr);
 

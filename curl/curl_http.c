@@ -7,6 +7,38 @@
 
 #include "curl_http.h"
 
+const static  struct table_entry content_type_table[] = {
+	{ "txt", "text/plain" },
+	{ "c", "text/plain" },
+	{ "h", "text/plain" },
+	{ "html", "text/html" },
+	{ "htm", "text/htm" },
+	{ "css", "text/css" },
+	{ "gif", "image/gif" },
+	{ "jpg", "image/jpeg" },
+	{ "jpeg", "image/jpeg" },
+	{ "png", "image/png" },
+	{ "pdf", "application/pdf" },
+	{ "ps", "application/postsript" },
+	{"js", "application/x-javascript"},
+	{ NULL, NULL },
+};
+
+//可以处理的静态扩展
+const static char *staticExts[] = {
+		"js",
+		"css",
+		"html",
+		"htm",
+		"png",
+		"jpg",
+		"jpeg",
+		"gif",
+		"bmp",
+		"map", //js符号映射
+		NULL
+};
+
 static const char *guess_content_type(const char *path)
 {
 	const char *last_period, *extension;
@@ -145,6 +177,14 @@ char *postParam(struct evkeyvalq *post_params_ptr, const char *name)
 	return data;
 }
 
+//是否含有get参数
+int have_get_params(struct evhttp_request *req)
+{
+	const char *http_query_part = evhttp_uri_get_query(req->uri_elems);
+	return http_query_part != NULL;
+}
+
+
 //是否get请求
 int is_get_request(struct evhttp_request *req)
 {
@@ -162,16 +202,25 @@ int is_x_www_form_urlencoded(struct evhttp_request *req)
 {
 	struct evkeyvalq *headers = evhttp_request_get_input_headers(req);
 	const char *content_type = evhttp_find_header(headers, "Content-Type");
-	return is_post_request(req) && !strcasecmp(content_type, "application/x-www-form-urlencoded");
+	return is_post_request(req) && !strncasecmp(content_type, "application/x-www-form-urlencoded", 33);
 }
 
 static void gen_request_cb(struct evhttp_request *req, void *arg)
 {
+	//呵呵，加个标记
+	evhttp_add_header(evhttp_request_get_output_headers(req), "X-Powered-By", "monitor_collect_change");
+
 	const char *uri = NULL, *path = NULL;
 	char *decoded_path = NULL;
 	struct evhttp_uri *decoded = NULL;
 	struct request_cb_complex   *request_cb_complex_ptr = NULL;
 	struct evbuffer *buf = NULL;
+
+	char *extension = NULL;
+	char *whole_path = NULL;
+	struct stat st;
+	int fd = -1;
+	size_t len = 0;
 
 
 	buf = evbuffer_new();
@@ -180,25 +229,77 @@ static void gen_request_cb(struct evhttp_request *req, void *arg)
 	decoded = evhttp_uri_parse(uri);
 
 	path = evhttp_uri_get_path(decoded);
-	if (!path) path = "/";
+	if (!path) path = "/index.html";
 
 	decoded_path = evhttp_uridecode(path, 0, NULL);
 
-	if ((request_cb_complex_ptr = find_request_cb(request_cb_complex_head, decoded_path))) {
-		if (!(*request_cb_complex_ptr->cb)(req, arg, buf)) {
+	//获取扩展名
+	extension =  getExtension(decoded_path);
+	if (extension != NULL) {
+		extension = strtolower(extension);
+#ifdef DEBUG
+	LOG(LOG_DEBUG, "decoded_path:%s, extension:%s", decoded_path, extension);
+#endif
+	}
+
+	//静态文件处理  参考libevent/sample/http-server.c
+	if (extension != NULL && !in_array(staticExts, extension)) {
+
+		len = strlen(decoded_path) + strlen(docroot) + strlen("web") + 3;
+		if (!(whole_path = malloc(len))) {
+			LOG(LOG_ERROR, "malloc error:%s", strerror(errno));
+			goto err;
+		}
+
+		evutil_snprintf(whole_path, len, "%s/%s/%s", docroot, "web", decoded_path);
+
+		if (stat(whole_path, &st)<0) {
+			goto err;
+		}
+
+		//如果是一般文件
+		if (S_ISREG(st.st_mode)) {
+			const char *type = guess_content_type(decoded_path);
+			if ((fd = open(whole_path, O_RDONLY)) < 0) {
+				LOG(LOG_ERROR, "open error:%s", strerror(errno));
+				goto err;
+			}
+
+			if (fstat(fd, &st)<0) {
+				LOG(LOG_ERROR, "fstat error:%s", strerror(errno));
+				goto err;
+			}
+			evhttp_add_header(evhttp_request_get_output_headers(req),"Content-Type", type);
+			evbuffer_add_file(buf, fd, 0, st.st_size);
 			evhttp_send_reply(req, 200, "OK", buf);
-		} else {
-			evhttp_send_error(req, HTTP_INTERNAL, "error");
 		}
 	} else {
-		evhttp_send_error(req, HTTP_NOTFOUND, "can't find request callback");
+		if ((request_cb_complex_ptr = find_request_cb(request_cb_complex_head, decoded_path))) {
+			if (!(*request_cb_complex_ptr->cb)(req, arg, buf)) {
+				evhttp_send_reply(req, 200, "OK", buf);
+			} else {
+				evhttp_send_error(req, HTTP_INTERNAL, "error");
+			}
+		} else {
+			evhttp_send_error(req, HTTP_NOTFOUND, "can't find request callback");
+		}
 	}
+	goto done;
+
+err:
+	evhttp_send_error(req, 404, "404 not found");
+	if (fd>=0)
+		close(fd);
+done:
 	if (decoded)
 		evhttp_uri_free(decoded);
 	if (decoded_path)
 		free(decoded_path);
+	if (whole_path)
+		free(whole_path);
 	if (buf != NULL)
 		evbuffer_free(buf);
+
 
 	evhttp_send_reply_end(req);
 }

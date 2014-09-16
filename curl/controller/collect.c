@@ -14,6 +14,29 @@ int collect_list_request_cb(struct evhttp_request *req, void *arg, struct evbuff
 	char *json_str = NULL;
 	result_data_t result_data;
 	memset(&result_data, 0, sizeof(result_data_t));
+	struct evkeyvalq *query_params_ptr = calloc(sizeof(struct evkeyvalq), 1);
+	char *callback = NULL;
+	int is_have_get_param = 0;
+
+	if (!is_get_request(req)) {
+		return -1;
+	}
+
+	is_have_get_param = have_get_params(req);
+
+	if (is_have_get_param) {
+		retCode = getParams(req, query_params_ptr);
+
+		if (retCode) {
+			if (query_params_ptr)
+				evhttp_clear_headers(query_params_ptr);
+			return -1;
+		}
+
+		callback = getParam(query_params_ptr, "callback");
+	}
+
+
 
 
 	retCode = mysql_connect(&conn, &mysql_connect_info);
@@ -25,7 +48,16 @@ int collect_list_request_cb(struct evhttp_request *req, void *arg, struct evbuff
 			json_str =	mysql_result_data_convert_json(&result_data);
 
 			evhttp_add_header(evhttp_request_get_output_headers(req), "Content-type", "application/json");
-			evbuffer_add_printf(buf, "%s", json_str);
+			if (callback != NULL) {
+				evbuffer_add_printf(buf, "%s(%s)", callback, json_str);
+			} else {
+				evbuffer_add_printf(buf, "%s", json_str);
+			}
+
+			if (query_params_ptr)
+				evhttp_clear_headers(query_params_ptr);
+			if (callback)
+				free(callback);
 
 			free(json_str);
 			free_result_data(&result_data);

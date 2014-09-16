@@ -77,6 +77,12 @@ int strpos(const char *haystack, const char *needle);
 //返回形如  2014-09-02 19:12:25 当前时间
 int getDate(char *date);
 
+//获取扩展
+char *getExtension(const char *path);
+
+//判断二维数组是否存在某个字符串
+int in_array(const char **arr, const char *str);
+
 //解析ini
 void *parse_ini_file(const char *ini_file_name);
 

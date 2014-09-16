@@ -23,6 +23,9 @@ pid_t batch_match_pid = 0;
 
 int block = 1;
 
+//当前根路径
+char *docroot = NULL;
+
 
 struct itimerval *ovalue = NULL;
 
@@ -45,6 +48,8 @@ void freeMem()
 	free(mysql_connect_info.user);
 	free(mysql_connect_info.pwd);
 	free(mysql_connect_info.db);
+
+	free(docroot);
 
 	free_request_cb_list(request_cb_complex_head);
 }
@@ -228,6 +233,11 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	docroot = getcwd(NULL, 0);
+#ifdef DEBUG
+	LOG(LOG_DEBUG, "docroot:%s", docroot);
+#endif
+
 	if (access(config_file_name, F_OK) < 0) {
 		LOG(LOG_ERROR, "%s don't exist!", config_file_name);
 		exit(EXIT_FAILURE);
@@ -267,7 +277,6 @@ int main(int argc, char *argv[])
 	if (batch_match) {
 		do_batch_match(batch_match_interval);
 	}
-
 
 	//http 服务启动
 	setup_http_server(ip, port);
